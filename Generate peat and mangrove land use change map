@@ -1,0 +1,141 @@
+/*
+  Title   : Peatland analyses - World peatland
+*/
+
+
+// ---------GENERAL DATA--------------------------------------------------------------------------------------------------------------------------------------------------------
+// 1. Input national boundary
+var SEA_land_EEZ = ee.FeatureCollection('users/sdsasmito/SEA_land_EEZ')
+// print(SEA_land_EEZ, {} ,'SEA_land_EEZ')
+
+
+////-----PEATLANDS DATA---------------
+// 2. Peatland - World------------------------------------------------------------------------------------------------------------------------------------------------
+var peat_world = ee.Image('users/aklmarco01/Peatland/Peatland_World_raster').eq(1)
+//Map.addLayer(peat_world.selfMask(), {min:0, max: 1, palette:['black']}, 'Peatland basemap', false)
+
+//3. TMF - Transition Map ------------------------------------------------------------------------------------------------------------------------------
+var TransitionMap = ee.ImageCollection('projects/JRC/TMF/v1_2022/TransitionMap_Subtypes').mosaic();
+// print(TransitionMap, 'TransitionMap')
+
+var TransitionMap_asia   = ee.Image('projects/JRC/TMF/v1_2022/TransitionMap_MainClasses/1ASIA')
+// print(TransitionMap_asia, 'TransitionMapAsia')
+
+var TransitionMap_peat_1 = TransitionMap_asia.reduce(ee.Reducer.sum())
+                           .mask(peat_world)
+// Map.addLayer(TransitionMap_peat_1.selfMask(), {min:1, max: 100}, 'Peat land cover 2021', false)
+
+var TransitionMap_peat                  = ee.Image(0).where(TransitionMap_peat_1.eq(10), 1)
+                                                    .where(TransitionMap_peat_1.eq(20), 2)
+                                                    .where(TransitionMap_peat_1.eq(30), 3)
+                                                    .where(TransitionMap_peat_1.eq(41), 4)
+                                                    .where(TransitionMap_peat_1.eq(42), 5)
+                                                    .where(TransitionMap_peat_1.eq(43), 6)
+                                                    .where(TransitionMap_peat_1.eq(50), 7)
+                                                    .where(TransitionMap_peat_1.eq(60), 8)
+                                                    .where(TransitionMap_peat_1.eq(70), 9)
+                                                    .byte()
+
+
+        /*
+        Legend---------------------------------------------------------------------
+        value 1. Undisturbed Tropical moist forest (TMF)
+        value 2. Degraded TMF
+        value 3. TMF regrowth
+        value 4. Tree plantation
+        value 5. Permanent or seasonal Water
+        value 6. Other land cover
+        value 7. Recent deforested or degraded
+        value 8. Permanent or seasonal Water
+        value 9. Other land cover
+        ---------------------------------------------------------------------------
+        */
+
+
+//6. Biomapama - Global Map of Oil Palm Plantations--------------------------------------------------------------------------------------------------------------------
+var biopama = ee.ImageCollection('BIOPAMA/GlobalOilPalm/v1').select('classification').mosaic();
+// print (biopama, {}, 'BIOPAMA')
+
+var op_biopama = ee.Image(0).where(biopama.eq(1),10) // Industrial OP
+                            .where(biopama.eq(2),11) // Small holder op
+                            .mask(peat_world)
+                            .byte()
+
+var tmf_biopama = TransitionMap_peat.blend(op_biopama.selfMask()).byte()
+
+//Map.addLayer(op_biopama.selfMask(), {min:10, max: 11, palette:['green', 'yellow']}, 'Oil Palm Biopama', false)
+
+//7. Burned Area map - MCD64A1.061 MODIS Burned Area Monthly Global 500m
+var burned_area = ee.ImageCollection('MODIS/061/MCD64A1').select('BurnDate')
+                  .filter(ee.Filter.date('2000-01-01', '2022-12-31')).mosaic();
+// print (burned_area, {}, 'burned_area')
+
+var burned_area_peat = ee.Image(0).where(peat_world.eq(1),2) // burned area
+                            .mask(burned_area)
+                            .byte()
+// print (burned_area_peat, {}, 'burned_area_peat')
+
+Map.addLayer(burned_area_peat.selfMask(), {min:0, max: 366, palette:['red']}, 'Burned area on peat', false);
+
+//8. Peat drainage data
+var Dadap_peat_drainage = ee.Image('users/sdsasmito/Dadap').select('b1')
+var drained_area_peat = ee.Image(0).where(peat_world.eq(1),2) // burned area
+                            .mask(Dadap_peat_drainage)
+                            .byte()
+
+//print(Dadap_peat_drainage, {} ,'Dadap_peat_drainage')
+Map.addLayer(drained_area_peat.selfMask(), {min:0, max: 1, palette:['blue']}, 'Peat drainage network', false)
+ 
+
+///////-------MANGROVE DATA-------------///////////
+
+//2. Global Mangrove Forests Distribution v.1.4--------------------------------------------------------------------------------------------------------------------------------------------
+var mangrove_v14 = ee.Image(1).rename('UNEP_Mangrove_v1_4').selfMask().clip(ee.FeatureCollection('users/aklkrid/MangroveUSGS2011_v1_4')).byte()
+//print (mangrove_v14, 'Metadata : Global Mangrove Forests Distribution v1.4')
+//Map.addLayer(mangrove_v14.selfMask(), {min:0, max: 1, palette:['green']}, 'Mangrove in 2000', false)
+
+
+//3. Hansen lossyear v.1.8 (2001-2020) masked with the Global Mangrove Forests Distribution v.1.4------------------------------------------------------------------------------------------------------
+//var hansen_v18 = ee.Image('UMD/hansen/global_forest_change_2020_v1_8')
+var hansen_v10 = ee.Image('UMD/hansen/global_forest_change_2022_v1_10')
+var hansen_lossyear_v1 = hansen_v10.select(3).mask(mangrove_v14.selfMask()).selfMask()
+var hansen_loss_v1 = hansen_v10.select(1).mask(mangrove_v14.selfMask()).selfMask()
+//print (hansen_lossyear_v1, 'hansen_lossyear_v1loss')
+
+//4. Goldberg Driver of Global Mangrove Loss (2000-2016)--------------------------------------------------------------------------------------------------------------------------------------------------------
+//var mangrove_loss_drivers = ee.Image('projects/mangrovescience/MangroveLossDrivers').selfMask()
+var mangrove_loss_drivers = ee.Image('projects/mangrovescience/MangroveLossDrivers').select(2).selfMask()
+print(mangrove_loss_drivers,'Driver of Global Mangrove Loss')
+//Map.addLayer(mangrove_loss_drivers.selfMask(), {min:1, max: 5}, 'Mangrove loss drivers', false)
+/* 
+  Legend/proxy : Loss Drivers 
+  1 = Erosion
+  2 = Commodities
+  3 = Settlement
+  4 = Non-Productive Conversion
+  5 = Extreme Climate Events
+*/
+
+//6. Biomapama - Global Map of Oil Palm Plantations--------------------------------------------------------------------------------------------------------------------
+var biopama = ee.ImageCollection('BIOPAMA/GlobalOilPalm/v1').select('classification').mosaic();
+print (biopama, {}, 'BIOPAMA')
+
+var op_biopama = ee.Image(0).where(biopama.eq(1),6) // Industrial OP
+                            .where(biopama.eq(2),7) // Small holder op
+                            .mask(mangrove_v14)
+                            .byte()
+
+Map.setCenter(119.17, 4.91);
+
+//7. SEA aquaculture data
+var aquaculture = ee.Image('users/sdsasmito/Aquaculture').select('b1')
+var aquaculture_mangrove = ee.Image(0).where(aquaculture.eq(3),3) 
+                            .mask(hansen_loss_v1)
+                            .byte()
+
+print(aquaculture_mangrove, {} ,'Aquaculture')
+//Map.addLayer(aquaculture_mangrove.selfMask(), {min:1, max: 7, palette:['blue']}, 'Aquaculture', false)
+
+
+
+
