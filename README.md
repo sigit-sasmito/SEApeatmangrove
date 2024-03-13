@@ -1,4 +1,4 @@
-# SEApeatmangrove
+# Southeast Asia peatland and mangrove land use change 2001-2022
 
 This repository contains code to generate map and calculate area of land use change impacted peatlands and mangroves in Southeast Asia between 2001-2022.
 
