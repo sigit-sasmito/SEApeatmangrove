@@ -1,29 +1,24 @@
 /*
-  Title   : Peatland analyses - World peatland
+The scippt contains code for generating land use change on peatlands and mangroves in Southeast Asia.
 */
 
 
-// ---------GENERAL DATA--------------------------------------------------------------------------------------------------------------------------------------------------------
+// ---------GENERAL DATA----------------------------------------------------------------------------------------------------------------------------------------------
 // 1. Input national boundary
 var SEA_land_EEZ = ee.FeatureCollection('users/sdsasmito/SEA_land_EEZ')
-// print(SEA_land_EEZ, {} ,'SEA_land_EEZ')
 
 
 ////-----PEATLANDS DATA---------------
 // 2. Peatland - World------------------------------------------------------------------------------------------------------------------------------------------------
-var peat_world = ee.Image('users/aklmarco01/Peatland/Peatland_World_raster').eq(1)
-//Map.addLayer(peat_world.selfMask(), {min:0, max: 1, palette:['black']}, 'Peatland basemap', false)
+var peat_world = ee.Image('users/aklmarco01/Peatland/Peatland_World_raster').eq(1)  // input global peatlands map Xu et al. 2018
 
 //3. TMF - Transition Map ------------------------------------------------------------------------------------------------------------------------------
-var TransitionMap = ee.ImageCollection('projects/JRC/TMF/v1_2022/TransitionMap_Subtypes').mosaic();
-// print(TransitionMap, 'TransitionMap')
+var TransitionMap = ee.ImageCollection('projects/JRC/TMF/v1_2022/TransitionMap_Subtypes').mosaic(); // input global tropical moist forest annual deforetation and transition obtained from Vancutsem et al. 2021
 
-var TransitionMap_asia   = ee.Image('projects/JRC/TMF/v1_2022/TransitionMap_MainClasses/1ASIA')
-// print(TransitionMap_asia, 'TransitionMapAsia')
+var TransitionMap_asia   = ee.Image('projects/JRC/TMF/v1_2022/TransitionMap_MainClasses/1ASIA') // select data for only Asia
 
-var TransitionMap_peat_1 = TransitionMap_asia.reduce(ee.Reducer.sum())
+var TransitionMap_peat_1 = TransitionMap_asia.reduce(ee.Reducer.sum()) // masking data with peatlands area
                            .mask(peat_world)
-// Map.addLayer(TransitionMap_peat_1.selfMask(), {min:1, max: 100}, 'Peat land cover 2021', false)
 
 var TransitionMap_peat                  = ee.Image(0).where(TransitionMap_peat_1.eq(10), 1)
                                                     .where(TransitionMap_peat_1.eq(20), 2)
@@ -53,60 +48,42 @@ var TransitionMap_peat                  = ee.Image(0).where(TransitionMap_peat_1
 
 
 //6. Biomapama - Global Map of Oil Palm Plantations--------------------------------------------------------------------------------------------------------------------
-var biopama = ee.ImageCollection('BIOPAMA/GlobalOilPalm/v1').select('classification').mosaic();
-// print (biopama, {}, 'BIOPAMA')
+var biopama = ee.ImageCollection('BIOPAMA/GlobalOilPalm/v1').select('classification').mosaic(); // input oil palm data 
 
-var op_biopama = ee.Image(0).where(biopama.eq(1),10) // Industrial OP
+var op_biopama = ee.Image(0).where(biopama.eq(1),10) // Industrial OP 
                             .where(biopama.eq(2),11) // Small holder op
-                            .mask(peat_world)
+                            .mask(peat_world)   // mask oil palm data with peatlands data
                             .byte()
 
-var tmf_biopama = TransitionMap_peat.blend(op_biopama.selfMask()).byte()
-
-//Map.addLayer(op_biopama.selfMask(), {min:10, max: 11, palette:['green', 'yellow']}, 'Oil Palm Biopama', false)
+var tmf_biopama = TransitionMap_peat.blend(op_biopama.selfMask()).byte() // combine oil palm data with deforestation and forest transition data
 
 //7. Burned Area map - MCD64A1.061 MODIS Burned Area Monthly Global 500m
 var burned_area = ee.ImageCollection('MODIS/061/MCD64A1').select('BurnDate')
-                  .filter(ee.Filter.date('2000-01-01', '2022-12-31')).mosaic();
-// print (burned_area, {}, 'burned_area')
+                  .filter(ee.Filter.date('2000-01-01', '2022-12-31')).mosaic(); // input burned area data
 
-var burned_area_peat = ee.Image(0).where(peat_world.eq(1),2) // burned area
+var burned_area_peat = ee.Image(0).where(peat_world.eq(1),2) // mask burned area data wit peatlands distribution data
                             .mask(burned_area)
                             .byte()
-// print (burned_area_peat, {}, 'burned_area_peat')
-
-Map.addLayer(burned_area_peat.selfMask(), {min:0, max: 366, palette:['red']}, 'Burned area on peat', false);
 
 //8. Peat drainage data
-var Dadap_peat_drainage = ee.Image('users/sdsasmito/Dadap').select('b1')
-var drained_area_peat = ee.Image(0).where(peat_world.eq(1),2) // burned area
+var Dadap_peat_drainage = ee.Image('users/sdsasmito/Dadap').select('b1') // input canal network data
+var drained_area_peat = ee.Image(0).where(peat_world.eq(1),2) // mask canal network data with peatlands distribution data
                             .mask(Dadap_peat_drainage)
                             .byte()
 
-//print(Dadap_peat_drainage, {} ,'Dadap_peat_drainage')
-Map.addLayer(drained_area_peat.selfMask(), {min:0, max: 1, palette:['blue']}, 'Peat drainage network', false)
- 
 
 ///////-------MANGROVE DATA-------------///////////
 
 //2. Global Mangrove Forests Distribution v.1.4--------------------------------------------------------------------------------------------------------------------------------------------
-var mangrove_v14 = ee.Image(1).rename('UNEP_Mangrove_v1_4').selfMask().clip(ee.FeatureCollection('users/aklkrid/MangroveUSGS2011_v1_4')).byte()
-//print (mangrove_v14, 'Metadata : Global Mangrove Forests Distribution v1.4')
-//Map.addLayer(mangrove_v14.selfMask(), {min:0, max: 1, palette:['green']}, 'Mangrove in 2000', false)
-
+var mangrove_v14 = ee.Image(1).rename('UNEP_Mangrove_v1_4').selfMask().clip(ee.FeatureCollection('users/aklkrid/MangroveUSGS2011_v1_4')).byte() // input mangrove data from Giri et al. 2011
 
 //3. Hansen lossyear v.1.8 (2001-2020) masked with the Global Mangrove Forests Distribution v.1.4------------------------------------------------------------------------------------------------------
-//var hansen_v18 = ee.Image('UMD/hansen/global_forest_change_2020_v1_8')
-var hansen_v10 = ee.Image('UMD/hansen/global_forest_change_2022_v1_10')
-var hansen_lossyear_v1 = hansen_v10.select(3).mask(mangrove_v14.selfMask()).selfMask()
-var hansen_loss_v1 = hansen_v10.select(1).mask(mangrove_v14.selfMask()).selfMask()
-//print (hansen_lossyear_v1, 'hansen_lossyear_v1loss')
+var hansen_v10 = ee.Image('UMD/hansen/global_forest_change_2022_v1_10') // input tree cover loss data
+var hansen_loss_v1 = hansen_v10.select(1).mask(mangrove_v14.selfMask()).selfMask() // mask tree cover loss data with mangrove distribution from Hansen et al. 2014
+
 
 //4. Goldberg Driver of Global Mangrove Loss (2000-2016)--------------------------------------------------------------------------------------------------------------------------------------------------------
-//var mangrove_loss_drivers = ee.Image('projects/mangrovescience/MangroveLossDrivers').selfMask()
-var mangrove_loss_drivers = ee.Image('projects/mangrovescience/MangroveLossDrivers').select(2).selfMask()
-print(mangrove_loss_drivers,'Driver of Global Mangrove Loss')
-//Map.addLayer(mangrove_loss_drivers.selfMask(), {min:1, max: 5}, 'Mangrove loss drivers', false)
+var mangrove_loss_drivers = ee.Image('projects/mangrovescience/MangroveLossDrivers').select(2).selfMask() //input mangrove loss drivers data Goldberg et al. 2019
 /* 
   Legend/proxy : Loss Drivers 
   1 = Erosion
@@ -117,25 +94,51 @@ print(mangrove_loss_drivers,'Driver of Global Mangrove Loss')
 */
 
 //6. Biomapama - Global Map of Oil Palm Plantations--------------------------------------------------------------------------------------------------------------------
-var biopama = ee.ImageCollection('BIOPAMA/GlobalOilPalm/v1').select('classification').mosaic();
-print (biopama, {}, 'BIOPAMA')
+var biopama = ee.ImageCollection('BIOPAMA/GlobalOilPalm/v1').select('classification').mosaic(); // input oil palm distribution data from Descals et al. 2020
 
 var op_biopama = ee.Image(0).where(biopama.eq(1),6) // Industrial OP
                             .where(biopama.eq(2),7) // Small holder op
-                            .mask(mangrove_v14)
+                            .mask(mangrove_v14)  // mask oil palm data with mangrove distribution data
                             .byte()
-
-Map.setCenter(119.17, 4.91);
 
 //7. SEA aquaculture data
-var aquaculture = ee.Image('users/sdsasmito/Aquaculture').select('b1')
+var aquaculture = ee.Image('users/sdsasmito/Aquaculture').select('b1') // input aquaculture distribution data from Clark Lab
 var aquaculture_mangrove = ee.Image(0).where(aquaculture.eq(3),3) 
-                            .mask(hansen_loss_v1)
+                            .mask(hansen_loss_v1) // mask aquaculture data with forest cover loss within mangrove area
                             .byte()
 
-print(aquaculture_mangrove, {} ,'Aquaculture')
-//Map.addLayer(aquaculture_mangrove.selfMask(), {min:1, max: 7, palette:['blue']}, 'Aquaculture', false)
+Map.setCenter(119.17, 4.91); // center the map visualization on Southeast Asia view
 
 
+//--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+// Overlay Analyses-----------------------------------------------------------------------------------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+// 1. Combine deforested peatlands with oil palm and drainage data----------------------------------------------------------------------------------------------------
+var tmf_biopama = TransitionMap_peat.blend(op_biopama.selfMask()).byte()
+var tmf_biopama_drainage = tmf_biopama.blend(drained_area_peat.selfMask()).byte()
 
+// 2. Overlay deforestation and deforestation drivers data inside peatland --------------------------------------------------------------------------------------------------------------------------
+var deforestation_peat_tmf = deforestion_peat.selfMask().addBands(tmf_biopama_drainage.multiply(10)).reduce(ee.Reducer.sum()).byte()
 
+// 3. Overlay deforestation drivers inside Burned Peatland -------------------------------------------------------------------------------------------------------------------
+var deforestation_TMF_peat_burned = deforestation_peat_tmf.selfMask().addBands(burned_area_peat.multiply(1)).reduce(ee.Reducer.sum()).byte()
+
+// 4. Overlay deforestation drivers inside Drained canal network Peatland ------------------------------------------------------------------------------------------------------------------
+var deforestation_TMF_peat_drained = deforestation_peat_tmf.selfMask().addBands(drained_area_peat.multiply(1)).reduce(ee.Reducer.sum()).byte()
+
+//5. Combine mangrove loss drivers with oil palm data 
+var Goldberg_biopama = mangrove_loss_drivers.blend(op_biopama.selfMask()).byte()
+        /*
+        Legend---------------------------------------------------------------------
+        value 1. Undisturbed Tropical Moist Forest (TMF)                   ----> 1
+        value 2. Degraded TMF                                              ----> 2
+        value 3. TMF regrowth                                              ----> 3
+        value 4. Deforested land - Forest converted to tree plantations    ----> 4
+        value 5. Recent deforestation or degradation (2019-2021)           ----> 5
+        value 6   Biopama Industrial Oil Plam                               ----> 6
+        value 7   Biopama Smallholder Oil Plam                              ----> 7
+        ---------------------------------------------------------------------------
+        */
+
+//6. Overlay mangrove loss drivers and mangrove loss -------------------------------------------------------------------------------------------------
+var deforestation_mangrove_drivers = Goldberg_biopama.selfMask().addBands(hansen_loss_v1.multiply(8).selfMask()).reduce(ee.Reducer.sum()).mask(hansen_loss_v1).byte()
