@@ -8,5 +8,7 @@ The code was developed in Google Earth Engine platform.
 
 The mapping analysis was part of on-going study entitled "Peat swamp forest and mangrove conservation in Southeast Asia can reduce regional land-use emissions by 55%".
 
+Access to the code: https://github.com/sigit-sasmito/SEApeatmangrove/blob/28f1f09d6a5b961b5ce1ab17622cc43027a71cca/Generate%20peat%20and%20mangrove%20land%20use%20change%20map 
+
 Citation:
 Sasmito, Taillardat, Adinugroho, Krisnawati, Novita, Fatoyinbo, Friess, Page, Lovelock, Murdiyarso, Taylor, Lupascu. Peat swamp forest and mangrove conservation in Southeast Asia can reduce regional land-use emissions by 55%. Under review.
